@@ -32,6 +32,7 @@ canvas {
   display: flex;
   gap: 14px;
   margin: 4px 0;
+  flex-wrap: wrap;
 }
 
 #hud .controls {
@@ -124,6 +125,15 @@ button {
   color: #fff;
   cursor: pointer;
   font-weight: 600;
+}
+
+button.secondary {
+  background: #3f475f;
+}
+
+.modeActions {
+  display: flex;
+  gap: 8px;
 }
 
 #killFeed {

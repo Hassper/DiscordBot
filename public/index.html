@@ -13,6 +13,7 @@
         <span id="status">Подключение...</span>
       </div>
       <div class="row">
+        <span id="modeLabel">Режим: -</span>
         <span id="health">HP: 100</span>
         <span id="score">Счёт: 0</span>
       </div>
@@ -21,10 +22,13 @@
 
     <div id="startOverlay">
       <div class="card">
-        <h1>Сетевой Aim тренажёр</h1>
-        <p>Дуэль 1v1. Заходите с двух вкладок/устройств и тренируйте аим по движущейся цели.</p>
+        <h1>Aim тренажёр</h1>
+        <p>Выберите режим: тренировка с ботом или сетевой 1v1 против другого игрока.</p>
         <input id="nameInput" maxlength="14" placeholder="Никнейм" />
-        <button id="startBtn">Начать</button>
+        <div class="modeActions">
+          <button id="botBtn" class="secondary">Тренировка с ботом</button>
+          <button id="pvpBtn">Сетевой 1v1</button>
+        </div>
       </div>
     </div>
 
