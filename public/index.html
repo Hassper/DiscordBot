@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aim Duel Trainer</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="hud">
+      <div class="row">
+        <strong>Aim Duel Trainer</strong>
+        <span id="status">Подключение...</span>
+      </div>
+      <div class="row">
+        <span id="health">HP: 100</span>
+        <span id="score">Счёт: 0</span>
+      </div>
+      <div class="row controls">WASD — движение, мышь — прицел, ЛКМ — выстрел, Esc — курсор</div>
+    </div>
+
+    <div id="startOverlay">
+      <div class="card">
+        <h1>Сетевой Aim тренажёр</h1>
+        <p>Дуэль 1v1. Заходите с двух вкладок/устройств и тренируйте аим по движущейся цели.</p>
+        <input id="nameInput" maxlength="14" placeholder="Никнейм" />
+        <button id="startBtn">Начать</button>
+      </div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="hitMarker">✦</div>
+    <div id="killFeed"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>
