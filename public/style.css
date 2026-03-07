@@ -4,7 +4,9 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; overflow: hidden; background: #111; color: #fff; cursor: none; }
+body { margin: 0; overflow: hidden; background: #111; color: #fff; }
+body.menu-open { cursor: auto; }
+body:not(.menu-open) { cursor: none; }
 canvas { display: block; }
 
 #hud {
@@ -33,6 +35,8 @@ canvas { display: block; }
 #crosshair.plus::before { width: 2px; height: 14px; left: 6px; }
 #crosshair.plus::after { width: 14px; height: 2px; top: 6px; }
 #crosshair.circle { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; }
+
+body.menu-open #customCursor { display: none; }
 
 #customCursor {
   position: fixed; width: 16px; height: 16px; border-radius: 50%;

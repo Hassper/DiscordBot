@@ -84,6 +84,19 @@ let lastRenderStamp = 0;
 let pausedByUnlock = false;
 let selectedLevel = 1;
 
+function setMenuOpen(isOpen) {
+  document.body.classList.toggle('menu-open', isOpen);
+  els.menuOverlay.style.display = isOpen ? 'flex' : 'none';
+  if (isOpen && document.pointerLockElement === renderer.domElement) {
+    document.exitPointerLock();
+  }
+  if (isOpen) {
+    els.lockOverlay.classList.add('hidden');
+    pausedByUnlock = false;
+  }
+}
+
+
 let myState = null;
 let prevPvpHp = MAX_HP;
 
@@ -472,6 +485,7 @@ function checkLevelEnd(now) {
     profile.stars += diff;
     saveProfile();
     renderAllPanels();
+setMenuOpen(true);
 
     setStatus(complete ? `Уровень ${modeState.level.current} пройден: ${stars}⭐` : 'Время вышло');
     openMenu();
@@ -556,13 +570,13 @@ function startMode(mode, level = 1) {
     setStatus('В бою');
   }
 
-  els.menuOverlay.style.display = 'none';
+  setMenuOpen(false);
+  pausedByUnlock = false;
   lockPointerHard();
 }
 
 function openMenu() {
-  els.menuOverlay.style.display = 'flex';
-  pausedByUnlock = false;
+  setMenuOpen(true);
 }
 
 function lockPointerHard() {
@@ -606,6 +620,7 @@ function renderShop() {
         profile.owned.push(item.id);
         saveProfile();
         renderAllPanels();
+setMenuOpen(true);
       });
     }
     d.appendChild(btn);
@@ -650,6 +665,7 @@ function renderAllPanels() {
   renderLevelSelect(); renderShop(); renderInventory(); renderLeaderboard(); updateHud();
 }
 renderAllPanels();
+setMenuOpen(true);
 
 function setActiveTab(tab) {
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
@@ -669,7 +685,11 @@ els.levelBtn.addEventListener('click', () => {
 });
 els.pvpBtn.addEventListener('click', () => startMode(GAME_MODE.PVP));
 els.benchmarkBtn.addEventListener('click', () => startMode(GAME_MODE.BENCHMARK));
-els.resumeBtn.addEventListener('click', () => { els.lockOverlay.classList.add('hidden'); lockPointerHard(); });
+els.resumeBtn.addEventListener('click', () => {
+  setMenuOpen(false);
+  els.lockOverlay.classList.add('hidden');
+  lockPointerHard();
+});
 
 window.addEventListener('mousemove', (e) => {
   els.customCursor.style.left = `${e.clientX}px`;
@@ -689,7 +709,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') {
     e.preventDefault();
     if (els.menuOverlay.style.display === 'none') openMenu();
-    else { els.menuOverlay.style.display = 'none'; lockPointerHard(); }
+    else { setMenuOpen(false); lockPointerHard(); }
   }
 });
 window.addEventListener('keyup', (e) => { if (e.code in keys) keys[e.code] = false; });
@@ -721,12 +741,11 @@ document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
   const inMenu = els.menuOverlay.style.display !== 'none';
   if (!locked && started && !inMenu) {
-    pausedByUnlock = true;
     els.lockOverlay.classList.remove('hidden');
   } else {
-    pausedByUnlock = false;
     els.lockOverlay.classList.add('hidden');
   }
+  pausedByUnlock = false;
 });
 
 socket.on('connect', () => setStatus('Подключено к серверу'));
@@ -802,7 +821,7 @@ function animate(now) {
     fpsFrames = 0; fpsAccum = 0;
   }
 
-  if (started && !pausedByUnlock && els.menuOverlay.style.display === 'none') {
+  if (started && els.menuOverlay.style.display === 'none') {
     if (weapon.reloading && now >= weapon.reloadEndAt) finishReload();
     shootLocal(now);
     updateAmmoHud(now);
