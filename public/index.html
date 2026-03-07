@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aim Duel Trainer</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="hud">
+      <div class="row">
+        <strong>Aim Duel Trainer</strong>
+        <span id="status">Подключение...</span>
+      </div>
+      <div class="row">
+        <span id="modeLabel">Режим: -</span>
+        <span id="score">Счёт: 0</span>
+        <span id="time">Время: 00:00</span>
+      </div>
+      <div class="row">
+        <span id="health">HP: 100</span>
+        <div class="hpBar"><div id="healthFill"></div></div>
+      </div>
+      <div class="row">
+        <span id="ammo">Патроны: 20/20</span>
+      </div>
+      <div class="row controls">WASD — движение, мышь — прицел, ЛКМ/зажать — стрельба, R — перезарядка, Esc — курсор</div>
+    </div>
+
+    <div id="startOverlay">
+      <div class="card">
+        <h1>Aim тренажёр</h1>
+        <p>Выберите режим: тренировка с ботом или сетевой 1v1 против другого игрока.</p>
+        <input id="nameInput" maxlength="14" placeholder="Никнейм" />
+        <div class="modeActions">
+          <button id="botBtn" class="secondary">Тренировка с ботом</button>
+          <button id="pvpBtn">Сетевой 1v1</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="hitMarker">✦</div>
+    <div id="killFeed"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>
