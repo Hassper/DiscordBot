@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aim Duel Trainer</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="hud">
+      <div class="row">
+        <strong>Aim Trainer</strong>
+        <span id="status">Подключение...</span>
+      </div>
+      <div class="row">
+        <span id="modeLabel">Режим: -</span>
+        <span id="score">Очки: 0</span>
+        <span id="time">00:00</span>
+        <span id="fps">FPS: --</span>
+      </div>
+      <div class="row">
+        <span id="health">HP: 500/500</span>
+        <div class="hpBar"><div id="healthFill"></div></div>
+      </div>
+      <div class="row">
+        <span id="levelInfo">Уровень: -</span>
+        <span id="starsInfo">⭐ 0</span>
+      </div>
+      <div class="row controls">WASD, Space, ЛКМ/зажать, R, M — меню</div>
+    </div>
+
+    <div id="ammoHud">
+      <div id="ammo">20/20</div>
+      <div class="ammoLabel">AMMO</div>
+    </div>
+
+    <div id="customCursor"></div>
+    <div id="crosshair" class="dot"></div>
+    <div id="hitMarker">✦</div>
+    <div id="killFeed"></div>
+
+    <div id="damageOverlay"></div>
+    <div id="deathOverlay">Вы убиты</div>
+
+    <div id="botHpWorld" class="worldHp hidden">
+      <div class="worldHpLabel">TARGET</div>
+      <div class="worldHpTrack"><div id="botHpFill"></div></div>
+    </div>
+
+    <div id="lockOverlay" class="hidden">
+      <div class="card small">
+        <h3>Игра на паузе</h3>
+        <p>Кликни, чтобы вернуть захват курсора.</p>
+        <button id="resumeBtn">Продолжить</button>
+      </div>
+    </div>
+
+    <div id="menuOverlay">
+      <div class="card menuCard">
+        <h1>Aim тренажёр</h1>
+
+        <div class="tabs">
+          <button data-tab="play" class="tab active">Игра</button>
+          <button data-tab="shop" class="tab">Магазин</button>
+          <button data-tab="inventory" class="tab">Инвентарь</button>
+          <button data-tab="leaderboard" class="tab">Лидеры</button>
+        </div>
+
+        <div class="tabPane active" id="tab-play">
+          <label class="formLabel">Никнейм</label>
+          <input id="nameInput" maxlength="14" placeholder="Никнейм" />
+
+          <label class="formLabel">Чувствительность: <span id="sensValue">2.2</span></label>
+          <input id="sensInput" type="range" min="0.8" max="8" step="0.1" value="2.2" />
+
+          <label class="formLabel">Гц рендера</label>
+          <select id="hzSelect">
+            <option value="60">60</option>
+            <option value="120" selected>120</option>
+            <option value="0">∞</option>
+          </select>
+
+          <div class="modeActions">
+            <button id="levelBtn" class="secondary">PvE уровни</button>
+            <button id="pvpBtn">Сетевой 1v1</button>
+            <button id="benchmarkBtn" class="warn">Benchmark (1 мин)</button>
+          </div>
+          <div id="levelSelect" class="levelGrid"></div>
+        </div>
+
+        <div class="tabPane" id="tab-shop">
+          <p>Звезды: <strong id="starsWallet">0</strong></p>
+          <div id="shopList" class="list"></div>
+        </div>
+
+        <div class="tabPane" id="tab-inventory">
+          <div id="inventoryList" class="list"></div>
+        </div>
+
+        <div class="tabPane" id="tab-leaderboard">
+          <p>Таблица бенчмарка (топ-10):</p>
+          <ol id="leaderboard"></ol>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>
