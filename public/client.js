@@ -678,7 +678,7 @@ els.sensInput.addEventListener('input', () => {
   els.sensValue.textContent = Number(els.sensInput.value).toFixed(1);
 });
 els.hzSelect.addEventListener('change', () => { renderHz = Number(els.hzSelect.value); });
-els.menuBtn.addEventListener('click', openMenu);
+if (els.menuBtn) els.menuBtn.addEventListener('click', openMenu);
 els.levelBtn.addEventListener('click', () => {
   setActiveTab('play');
   startMode(GAME_MODE.LEVELS, selectedLevel);

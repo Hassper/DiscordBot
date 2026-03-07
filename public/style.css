@@ -94,3 +94,5 @@ button.warn { background: #935223; }
 ol { padding-left: 20px; }
 
 .levelBtn.selected { background: #4f78d9; box-shadow: 0 0 0 2px rgba(151,194,255,.45) inset; }
+
+.menuMini { width: auto; padding: 6px 10px; font-size: 12px; background: #56617e; }
