@@ -17,6 +17,7 @@
         <span id="score">Очки: 0</span>
         <span id="time">00:00</span>
         <span id="fps">FPS: --</span>
+        <span id="speed">Скорость: 0.00</span>
       </div>
       <div class="row">
         <span id="health">HP: 500/500</span>
@@ -35,8 +36,7 @@
       <div class="ammoLabel">AMMO</div>
     </div>
 
-    <div id="customCursor"></div>
-    <div id="crosshair" class="dot"></div>
+        <div id="crosshair" class="dot"></div>
     <div id="hitMarker">✦</div>
     <div id="killFeed"></div>
 
@@ -73,6 +73,13 @@
 
           <label class="formLabel">Чувствительность: <span id="sensValue">2.2</span></label>
           <input id="sensInput" type="range" min="0.8" max="8" step="0.1" value="2.2" />
+
+          <label class="formLabel">Сложность бота (PvE)</label>
+          <select id="difficultySelect">
+            <option value="easy">Легко</option>
+            <option value="normal" selected>Нормально</option>
+            <option value="hard">Сложно</option>
+          </select>
 
           <label class="formLabel">Гц рендера</label>
           <select id="hzSelect">

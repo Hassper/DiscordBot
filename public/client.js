@@ -4,13 +4,13 @@ const socket = io();
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  status: $('status'), modeLabel: $('modeLabel'), score: $('score'), time: $('time'), fps: $('fps'),
+  status: $('status'), modeLabel: $('modeLabel'), score: $('score'), time: $('time'), fps: $('fps'), speed: $('speed'),
   health: $('health'), healthFill: $('healthFill'), levelInfo: $('levelInfo'), starsInfo: $('starsInfo'),
-  ammo: $('ammo'), crosshair: $('crosshair'), customCursor: $('customCursor'), hitMarker: $('hitMarker'),
+  ammo: $('ammo'), crosshair: $('crosshair'), hitMarker: $('hitMarker'),
   killFeed: $('killFeed'), damageOverlay: $('damageOverlay'), deathOverlay: $('deathOverlay'),
   botHpWorld: $('botHpWorld'), botHpFill: $('botHpFill'),
   menuOverlay: $('menuOverlay'), lockOverlay: $('lockOverlay'), resumeBtn: $('resumeBtn'), menuBtn: $('menuBtn'),
-  nameInput: $('nameInput'), sensInput: $('sensInput'), sensValue: $('sensValue'), hzSelect: $('hzSelect'),
+  nameInput: $('nameInput'), sensInput: $('sensInput'), sensValue: $('sensValue'), difficultySelect: $('difficultySelect'), hzSelect: $('hzSelect'),
   levelBtn: $('levelBtn'), pvpBtn: $('pvpBtn'), benchmarkBtn: $('benchmarkBtn'), levelSelect: $('levelSelect'),
   starsWallet: $('starsWallet'), shopList: $('shopList'), inventoryList: $('inventoryList'), leaderboard: $('leaderboard')
 };
@@ -28,13 +28,19 @@ const HITBOX = { bodyRadius: 0.72, headRadius: 0.38, bodyOffsetY: 0, headOffsetY
 
 const levelConfigs = Array.from({ length: 10 }, (_, i) => ({
   id: i + 1,
-  targetKills: 6 + i * 2,
-  timeLimit: 42 - i * 2,
-  botSpeed: 4.1 + i * 0.35,
-  botFireDelayMin: 480 - i * 20,
-  botFireDelayMax: 760 - i * 18,
-  botJumpChance: 0.22 + i * 0.03
+  targetKills: 5 + i,
+  timeLimit: 50 - i,
+  botSpeed: 3.2 + i * 0.22,
+  botFireDelayMin: 620 - i * 14,
+  botFireDelayMax: 940 - i * 18,
+  botJumpChance: 0.10 + i * 0.02,
+  mapId: (i % 3) + 1
 }));
+const difficultyPresets = {
+  easy: { speed: 0.85, jump: 0.8, damage: 0.7 },
+  normal: { speed: 1, jump: 1, damage: 1 },
+  hard: { speed: 1.25, jump: 1.25, damage: 1.2 }
+};
 
 const shopItems = [
   { id: 'enemy_default', type: 'enemySkin', name: 'Enemy: Classic', price: 0, color: 0xff596d },
@@ -83,6 +89,7 @@ let renderHz = Number(els.hzSelect.value);
 let lastRenderStamp = 0;
 let pausedByUnlock = false;
 let selectedLevel = 1;
+let selectedDifficulty = 'normal';
 
 function setMenuOpen(isOpen) {
   document.body.classList.toggle('menu-open', isOpen);
@@ -134,11 +141,64 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.72);
 dirLight.position.set(8, 20, -4);
 scene.add(dirLight);
 
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ color: 0x4d5866, roughness: 0.94 }));
+const checkerCanvas = document.createElement('canvas');
+checkerCanvas.width = 128; checkerCanvas.height = 128;
+const cctx = checkerCanvas.getContext('2d');
+for (let y=0; y<8; y+=1) {
+  for (let x=0; x<8; x+=1) {
+    cctx.fillStyle = (x+y)%2 ? '#7fa17a' : '#6f9470';
+    cctx.fillRect(x*16,y*16,16,16);
+  }
+}
+const groundTex = new THREE.CanvasTexture(checkerCanvas);
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+groundTex.repeat.set(16,16);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ color: 0xcfe2bf, roughness: 0.9, map: groundTex }));
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
+scene.background = new THREE.Color(0xaed0ff);
+scene.fog = new THREE.Fog(0xaed0ff, 30, 150);
 
 const walls = [];
+let obstacleMeshes = [];
+let mapObstacles = [];
+
+function buildMapObstacles(mapId = 1) {
+  obstacleMeshes.forEach((m) => scene.remove(m));
+  obstacleMeshes = [];
+  mapObstacles = [];
+  const defs = mapId === 1 ? [
+    {x:-4,z:-3,w:2,h:2},{x:4,z:2,w:2.6,h:1.4},{x:0,z:6,w:4,h:1.2}
+  ] : mapId === 2 ? [
+    {x:-6,z:0,w:1.5,h:5},{x:6,z:0,w:1.5,h:5},{x:0,z:0,w:3,h:1.2}
+  ] : [
+    {x:-5,z:-5,w:2,h:2},{x:5,z:-5,w:2,h:2},{x:0,z:4,w:5,h:1.5},{x:0,z:-1,w:1.3,h:5}
+  ];
+  defs.forEach((d) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(d.w, 2.2, d.h), new THREE.MeshStandardMaterial({ color: 0x8f9f7c, roughness: 0.85 }));
+    mesh.position.set(d.x,1.1,d.z);
+    obstacleMeshes.push(mesh);
+    scene.add(mesh);
+    mapObstacles.push({x:d.x,z:d.z,w:d.w/2,h:d.h/2});
+  });
+}
+
+function resolveObstacleCollision(entity, radius=0.5) {
+  for (const o of mapObstacles) {
+    const nx = Math.max(o.x-o.w-radius, Math.min(entity.x, o.x+o.w+radius));
+    const nz = Math.max(o.z-o.h-radius, Math.min(entity.z, o.z+o.h+radius));
+    const dx = entity.x - nx;
+    const dz = entity.z - nz;
+    const d2 = dx*dx + dz*dz;
+    if (d2 < radius*radius) {
+      const d = Math.sqrt(d2) || 0.001;
+      const push = (radius - d) + 0.01;
+      entity.x += (dx / d) * push;
+      entity.z += (dz / d) * push;
+    }
+  }
+}
+
 function half() { return mapSize / 2; }
 function arenaClamp(v) { return Math.max(-(half() - 1), Math.min(half() - 1, v)); }
 function buildWalls() {
@@ -153,6 +213,7 @@ function buildWalls() {
   walls.push(north, south, west, east); walls.forEach((w) => scene.add(w));
 }
 buildWalls();
+buildMapObstacles(1);
 
 function createEnemyMesh(color = 0xff596d) {
   const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.58, 0.95, 8, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
@@ -168,11 +229,17 @@ botMesh.visible = false;
 const opponentMeshes = new Map();
 
 const gunRoot = new THREE.Group();
-const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.62), new THREE.MeshStandardMaterial({ color: 0x6f7788, metalness: 0.4, roughness: 0.3 }));
-gunBody.position.set(0.1, -0.15, -0.45);
-const gunSight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.1), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-gunSight.position.set(0.1, -0.03, -0.5);
-gunRoot.add(gunBody, gunSight);
+const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.42), new THREE.MeshStandardMaterial({ color: 0x6f7788, metalness: 0.4, roughness: 0.3 }));
+const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.26,12), new THREE.MeshStandardMaterial({ color: 0x3b3f4a, metalness:0.6, roughness:0.25 }));
+gunBarrel.rotation.x = Math.PI/2;
+gunBarrel.position.set(0.03, 0.0, -0.34);
+const gunHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.12,0.08), new THREE.MeshStandardMaterial({ color: 0x2b2f39 }));
+gunHandle.position.set(-0.04,-0.11,-0.12);
+const gunSight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.06), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+gunSight.position.set(0.04, 0.06, -0.18);
+gunRoot.position.set(0.28,-0.22,-0.34);
+gunRoot.scale.setScalar(0.85);
+gunRoot.add(gunBody, gunBarrel, gunHandle, gunSight);
 camera.add(gunRoot);
 scene.add(camera);
 
@@ -286,6 +353,7 @@ function applyPlayerPhysics(dt) {
 
   localPlayer.x = arenaClamp(localPlayer.x + localPlayer.velX * dt);
   localPlayer.z = arenaClamp(localPlayer.z + localPlayer.velZ * dt);
+  resolveObstacleCollision(localPlayer, 0.45);
   localPlayer.y += localPlayer.velY * dt;
   if (localPlayer.y <= 1.8) { localPlayer.y = 1.8; localPlayer.velY = 0; localPlayer.onGround = true; }
 }
@@ -300,14 +368,16 @@ function resetLocalPlayer() {
 
 function configureBotForLevel(levelId) {
   const c = levelConfigs[levelId - 1];
-  bot.speed = c.botSpeed;
-  bot.jumpChance = c.botJumpChance;
+  const d = difficultyPresets[selectedDifficulty] || difficultyPresets.normal;
+  bot.speed = c.botSpeed * d.speed;
+  bot.jumpChance = c.botJumpChance * d.jump;
   bot.alive = true; bot.hp = MAX_HP; bot.x = 0; bot.y = 1; bot.z = 0;
   bot.moveAngle = Math.random() * Math.PI * 2;
   bot.changeDirAt = performance.now() + 600;
   bot.shootAt = performance.now() + 700;
   bot.nextJumpAt = performance.now() + 1000;
   bot.vy = 0; bot.onGround = true;
+  buildMapObstacles(c.mapId);
 }
 
 function updateBot(dt, now) {
@@ -350,13 +420,15 @@ function updateBot(dt, now) {
 
     bot.x = arenaClamp(bot.x + Math.sin(bot.moveAngle) * bot.speed * dt);
     bot.z = arenaClamp(bot.z + Math.cos(bot.moveAngle) * bot.speed * dt);
+    resolveObstacleCollision(bot, 0.5);
 
     if (now >= bot.shootAt) {
       const dist = Math.hypot(localPlayer.x - bot.x, localPlayer.z - bot.z);
       if (localPlayer.alive && dist < 30) {
         const chance = 0.66 - Math.min(0.42, dist * 0.013);
         if (Math.random() < chance) {
-          localPlayer.hp = Math.max(0, localPlayer.hp - 18);
+          const d = difficultyPresets[selectedDifficulty] || difficultyPresets.normal;
+          localPlayer.hp = Math.max(0, localPlayer.hp - Math.round(18 * d.damage));
           flashDamage();
           updateHud();
           if (localPlayer.hp <= 0 && localPlayer.alive) {
@@ -424,8 +496,8 @@ function shootLocal(now) {
   weapon.nextShotAt = now + FIRE_INTERVAL;
   playTone(220, 45, 0.022, 'square');
 
-  gunRoot.position.z = -0.38;
-  setTimeout(() => { gunRoot.position.z = -0.45; }, 70);
+  gunRoot.position.z = -0.28;
+  setTimeout(() => { gunRoot.position.z = -0.34; }, 70);
 
   const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
   const origin = camera.position;
@@ -446,7 +518,10 @@ function shootLocal(now) {
           bot.respawnAt = now + 820;
           modeState.level.kills += 1;
           localPlayer.score += 100;
+          profile.stars += 1;
+          saveProfile();
           refillAmmo();
+          updateHud();
           checkLevelEnd(now);
         }
       }
@@ -485,7 +560,6 @@ function checkLevelEnd(now) {
     profile.stars += diff;
     saveProfile();
     renderAllPanels();
-setMenuOpen(true);
 
     setStatus(complete ? `Уровень ${modeState.level.current} пройден: ${stars}⭐` : 'Время вышло');
     openMenu();
@@ -495,11 +569,11 @@ setMenuOpen(true);
 function spawnBenchmarkTargets() {
   benchmarkTargets.forEach((t) => scene.remove(t.mesh));
   benchmarkTargets = [];
-  for (let i = 0; i < 18; i += 1) {
-    const radius = 0.22 + Math.random() * 0.45;
+  for (let i = 0; i < 8; i += 1) {
+    const radius = 0.35 + Math.random() * 0.45;
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 16), new THREE.MeshStandardMaterial({ color: 0x8fc5ff }));
     scene.add(mesh);
-    benchmarkTargets.push({ mesh, radius, alive: true, angle: Math.random() * Math.PI * 2, elev: (Math.random() - 0.5) * 0.9, speed: 0.8 + Math.random() * 1.2, dist: 5 + Math.random() * 9 });
+    benchmarkTargets.push({ mesh, radius, alive: true, angle: Math.random() * Math.PI * 2, elev: (Math.random() - 0.5) * 0.6, speed: 0.45 + Math.random() * 0.55, dist: 4 + Math.random() * 6, x:0, y:2, z:0 });
   }
 }
 
@@ -511,7 +585,7 @@ function updateBenchmarkTargets(dt) {
       t.dist -= dt * 7;
       if (t.dist <= 0.2) {
         t.alive = true;
-        t.radius = 0.22 + Math.random() * 0.45;
+        t.radius = 0.35 + Math.random() * 0.45;
         t.mesh.geometry.dispose();
         t.mesh.geometry = new THREE.SphereGeometry(t.radius, 16, 16);
         t.dist = 5 + Math.random() * 9;
@@ -521,7 +595,8 @@ function updateBenchmarkTargets(dt) {
     t.mesh.visible = true;
     const x = Math.cos(t.angle) * t.dist;
     const z = Math.sin(t.angle) * t.dist;
-    const y = 2.1 + Math.sin(t.angle * 1.3) * 1.6 + t.elev;
+    const y = 2.1 + Math.sin(t.angle * 1.1) * 1.1 + t.elev;
+    t.x = x; t.y = y; t.z = z;
     t.mesh.position.set(x, y, z);
   });
 }
@@ -608,7 +683,12 @@ function renderShop() {
     const owned = profile.owned.includes(item.id);
     const d = document.createElement('div');
     d.className = `item ${owned ? 'owned' : ''}`;
-    d.innerHTML = `<strong>${item.name}</strong><div class="meta">Цена: ${item.price}⭐</div>`;
+    const preview = item.type === 'enemySkin'
+      ? `<div class="preview"><div class="enemy" style="background:#${(item.color||0).toString(16).padStart(6,'0')}"></div></div>`
+      : item.type === 'weaponSkin'
+        ? `<div class="preview"><div class="weapon" style="background:#${(item.color||0).toString(16).padStart(6,'0')}"></div></div>`
+        : `<div class="preview"><div class="cross">${item.style==='plus'?'+':item.style==='circle'?'◯':'•'}</div></div>`;
+    d.innerHTML = `<strong>${item.name}</strong><div class="meta">Цена: ${item.price}⭐</div>${preview}`;
     const btn = document.createElement('button');
     if (owned) {
       btn.textContent = 'Куплено'; btn.disabled = true;
@@ -620,7 +700,6 @@ function renderShop() {
         profile.owned.push(item.id);
         saveProfile();
         renderAllPanels();
-setMenuOpen(true);
       });
     }
     d.appendChild(btn);
@@ -678,6 +757,7 @@ els.sensInput.addEventListener('input', () => {
   els.sensValue.textContent = Number(els.sensInput.value).toFixed(1);
 });
 els.hzSelect.addEventListener('change', () => { renderHz = Number(els.hzSelect.value); });
+els.difficultySelect.addEventListener('change', () => { selectedDifficulty = els.difficultySelect.value; });
 if (els.menuBtn) els.menuBtn.addEventListener('click', openMenu);
 els.levelBtn.addEventListener('click', () => {
   setActiveTab('play');
@@ -692,8 +772,6 @@ els.resumeBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('mousemove', (e) => {
-  els.customCursor.style.left = `${e.clientX}px`;
-  els.customCursor.style.top = `${e.clientY}px`;
   if (document.pointerLockElement !== renderer.domElement || !started) return;
   cameraEuler.yaw -= e.movementX * mouseSensitivity;
   cameraEuler.pitch -= e.movementY * mouseSensitivity;
@@ -822,6 +900,8 @@ function animate(now) {
   }
 
   if (started && els.menuOverlay.style.display === 'none') {
+    const speed = Math.hypot(localPlayer.velX, localPlayer.velZ);
+    els.speed.textContent = `Скорость: ${speed.toFixed(2)}`;
     if (weapon.reloading && now >= weapon.reloadEndAt) finishReload();
     shootLocal(now);
     updateAmmoHud(now);

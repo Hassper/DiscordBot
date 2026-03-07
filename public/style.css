@@ -36,14 +36,6 @@ canvas { display: block; }
 #crosshair.plus::after { width: 14px; height: 2px; top: 6px; }
 #crosshair.circle { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; }
 
-body.menu-open #customCursor { display: none; }
-
-#customCursor {
-  position: fixed; width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.75); transform: translate(-50%,-50%);
-  pointer-events: none; z-index: 25;
-}
-
 #hitMarker { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); opacity: 0; font-size: 32px; z-index: 9; transition: opacity .12s; }
 #killFeed { position: fixed; top: 14px; right: 16px; width: 300px; z-index: 10; }
 .kill { padding: 8px 10px; margin-bottom: 8px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; }
@@ -96,3 +88,9 @@ ol { padding-left: 20px; }
 .levelBtn.selected { background: #4f78d9; box-shadow: 0 0 0 2px rgba(151,194,255,.45) inset; }
 
 .menuMini { width: auto; padding: 6px 10px; font-size: 12px; background: #56617e; }
+
+.preview { width: 100%; height: 62px; margin-top: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.04); }
+.preview .enemy { width: 30px; height: 42px; border-radius: 10px; position: relative; }
+.preview .enemy::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #ffd8d8; left: 6px; top: -12px; }
+.preview .weapon { width: 70px; height: 20px; border-radius: 6px; }
+.preview .cross { color: #fff; font-size: 26px; }
