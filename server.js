@@ -17,6 +17,9 @@ const BODY_DAMAGE = 34;
 const HEAD_DAMAGE = 58;
 const RESPAWN_TIME_MS = 1500;
 const FIRE_INTERVAL_MS = 105;
+const MAX_HP = 500;
+const GRAVITY = 24;
+const JUMP_SPEED = 8.2;
 
 app.use(express.static('public'));
 
@@ -83,9 +86,9 @@ const packPlayer = (player) => ({
   yaw: player.yaw,
   pitch: player.pitch,
   hp: player.hp,
+  maxHp: MAX_HP,
   score: player.score,
-  alive: player.alive,
-  lastHitAt: player.lastHitAt
+  alive: player.alive
 });
 
 const broadcastState = () => {
@@ -95,9 +98,10 @@ const broadcastState = () => {
 
 const respawnPlayer = (player) => {
   player.pos = createSpawn();
-  player.hp = 100;
+  player.hp = MAX_HP;
   player.alive = true;
-  player.lastHitAt = now();
+  player.vy = 0;
+  player.onGround = true;
 };
 
 const processShot = (shooterId, payload) => {
@@ -153,11 +157,12 @@ const processShot = (shooterId, payload) => {
 
   const damage = best.isHead ? HEAD_DAMAGE : BODY_DAMAGE;
   best.target.hp -= damage;
-  best.target.lastHitAt = shotTime;
 
   if (best.target.hp <= 0) {
     best.target.alive = false;
     shooter.score += 1;
+
+    io.to(shooter.id).emit('refillAmmo');
     io.emit('killFeed', {
       killer: shooter.name,
       victim: best.target.name,
@@ -187,19 +192,21 @@ io.on('connection', (socket) => {
     pos: spawn,
     yaw: 0,
     pitch: 0,
-    hp: 100,
+    hp: MAX_HP,
     score: 0,
     alive: true,
     input: {
       moveX: 0,
-      moveZ: 0
+      moveZ: 0,
+      jump: false
     },
-    lastHitAt: now(),
+    vy: 0,
+    onGround: true,
     lastShotAt: 0
   };
 
   players.set(socket.id, player);
-  socket.emit('welcome', { id: socket.id, mapSize: MAP_SIZE });
+  socket.emit('welcome', { id: socket.id, mapSize: MAP_SIZE, maxHp: MAX_HP, tickRate: TICK_RATE });
 
   socket.on('setName', (name) => {
     if (typeof name === 'string') {
@@ -214,6 +221,7 @@ io.on('connection', (socket) => {
     if (!player.alive) return;
     player.input.moveX = Math.max(-1, Math.min(1, Number(data.moveX) || 0));
     player.input.moveZ = Math.max(-1, Math.min(1, Number(data.moveZ) || 0));
+    player.input.jump = Boolean(data.jump);
     player.yaw = Number(data.yaw) || 0;
     player.pitch = Number(data.pitch) || 0;
   });
@@ -250,7 +258,20 @@ setInterval(() => {
 
     player.pos.x = clampToArena(player.pos.x + velocityX * dt);
     player.pos.z = clampToArena(player.pos.z + velocityZ * dt);
-    player.pos.y = PLAYER_HEIGHT;
+
+    if (player.input.jump && player.onGround) {
+      player.vy = JUMP_SPEED;
+      player.onGround = false;
+    }
+
+    player.vy -= GRAVITY * dt;
+    player.pos.y += player.vy * dt;
+
+    if (player.pos.y <= PLAYER_HEIGHT) {
+      player.pos.y = PLAYER_HEIGHT;
+      player.vy = 0;
+      player.onGround = true;
+    }
   });
 
   broadcastState();
