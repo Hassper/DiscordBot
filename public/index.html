@@ -18,20 +18,39 @@
         <span id="time">Время: 00:00</span>
       </div>
       <div class="row">
-        <span id="health">HP: 100</span>
+        <span id="health">HP: 500</span>
         <div class="hpBar"><div id="healthFill"></div></div>
       </div>
       <div class="row">
-        <span id="ammo">Патроны: 20/20</span>
+        <span id="fps">FPS: --</span>
+        <label class="hzControl">Гц:
+          <select id="hzSelect">
+            <option value="60">60</option>
+            <option value="120" selected>120</option>
+            <option value="0">∞</option>
+          </select>
+        </label>
       </div>
-      <div class="row controls">WASD — движение, мышь — прицел, ЛКМ/зажать — стрельба, R — перезарядка, Esc — курсор</div>
+      <div class="row controls">WASD — движение, Space — прыжок, мышь — прицел, ЛКМ/зажать — стрельба, R — перезарядка, Esc — курсор</div>
+      <button id="menuBtn" class="menuBtn">Меню</button>
+    </div>
+
+    <div id="ammoHud">
+      <div id="ammo">20/20</div>
+      <div class="ammoLabel">AMMO</div>
     </div>
 
     <div id="startOverlay">
       <div class="card">
         <h1>Aim тренажёр</h1>
-        <p>Выберите режим: тренировка с ботом или сетевой 1v1 против другого игрока.</p>
+        <p>Главное меню: выберите режим и настройки.</p>
+
+        <label class="formLabel">Никнейм</label>
         <input id="nameInput" maxlength="14" placeholder="Никнейм" />
+
+        <label class="formLabel">Чувствительность: <span id="sensValue">2.2</span></label>
+        <input id="sensInput" type="range" min="0.8" max="8" step="0.1" value="2.2" />
+
         <div class="modeActions">
           <button id="botBtn" class="secondary">Тренировка с ботом</button>
           <button id="pvpBtn">Сетевой 1v1</button>
@@ -42,6 +61,14 @@
     <div id="crosshair"></div>
     <div id="hitMarker">✦</div>
     <div id="killFeed"></div>
+
+    <div id="damageOverlay"></div>
+    <div id="deathOverlay">Вы убиты</div>
+
+    <div id="botHpWorld" class="worldHp hidden">
+      <div class="worldHpLabel">BOT</div>
+      <div class="worldHpTrack"><div id="botHpFill"></div></div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/client.js"></script>

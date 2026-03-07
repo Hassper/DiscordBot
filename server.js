@@ -17,6 +17,9 @@ const BODY_DAMAGE = 34;
 const HEAD_DAMAGE = 58;
 const RESPAWN_TIME_MS = 1500;
 const FIRE_INTERVAL_MS = 105;
+const MAX_HP = 500;
+const GRAVITY = 24;
+const JUMP_SPEED = 8.2;
 
 app.use(express.static('public'));
 
@@ -83,9 +86,9 @@ const packPlayer = (player) => ({
   yaw: player.yaw,
   pitch: player.pitch,
   hp: player.hp,
+  maxHp: MAX_HP,
   score: player.score,
-  alive: player.alive,
-  lastHitAt: player.lastHitAt
+  alive: player.alive
 });
 
 const broadcastState = () => {
@@ -95,9 +98,10 @@ const broadcastState = () => {
 
 const respawnPlayer = (player) => {
   player.pos = createSpawn();
-  player.hp = 100;
+  player.hp = MAX_HP;
   player.alive = true;
-  player.lastHitAt = now();
+  player.vy = 0;
+  player.onGround = true;
 };
 
 const processShot = (shooterId, payload) => {
@@ -124,11 +128,11 @@ const processShot = (shooterId, payload) => {
       return;
     }
 
-    const bodyCenter = { x: target.pos.x, y: target.pos.y - 0.45, z: target.pos.z };
-    const headCenter = { x: target.pos.x, y: target.pos.y + 0.5, z: target.pos.z };
+    const bodyCenter = { x: target.pos.x, y: target.pos.y - 0.8, z: target.pos.z };
+    const headCenter = { x: target.pos.x, y: target.pos.y + 0.15, z: target.pos.z };
 
     const bodyHit = raySphereDistance(shooter.pos, dir, bodyCenter, 0.72);
-    const headHit = raySphereDistance(shooter.pos, dir, headCenter, 0.36);
+    const headHit = raySphereDistance(shooter.pos, dir, headCenter, 0.38);
 
     if (bodyHit === null && headHit === null) {
       return;
@@ -153,11 +157,12 @@ const processShot = (shooterId, payload) => {
 
   const damage = best.isHead ? HEAD_DAMAGE : BODY_DAMAGE;
   best.target.hp -= damage;
-  best.target.lastHitAt = shotTime;
 
   if (best.target.hp <= 0) {
     best.target.alive = false;
     shooter.score += 1;
+
+    io.to(shooter.id).emit('refillAmmo');
     io.emit('killFeed', {
       killer: shooter.name,
       victim: best.target.name,
@@ -187,19 +192,21 @@ io.on('connection', (socket) => {
     pos: spawn,
     yaw: 0,
     pitch: 0,
-    hp: 100,
+    hp: MAX_HP,
     score: 0,
     alive: true,
     input: {
       moveX: 0,
-      moveZ: 0
+      moveZ: 0,
+      jump: false
     },
-    lastHitAt: now(),
+    vy: 0,
+    onGround: true,
     lastShotAt: 0
   };
 
   players.set(socket.id, player);
-  socket.emit('welcome', { id: socket.id, mapSize: MAP_SIZE });
+  socket.emit('welcome', { id: socket.id, mapSize: MAP_SIZE, maxHp: MAX_HP, tickRate: TICK_RATE });
 
   socket.on('setName', (name) => {
     if (typeof name === 'string') {
@@ -214,6 +221,7 @@ io.on('connection', (socket) => {
     if (!player.alive) return;
     player.input.moveX = Math.max(-1, Math.min(1, Number(data.moveX) || 0));
     player.input.moveZ = Math.max(-1, Math.min(1, Number(data.moveZ) || 0));
+    player.input.jump = Boolean(data.jump);
     player.yaw = Number(data.yaw) || 0;
     player.pitch = Number(data.pitch) || 0;
   });
@@ -240,17 +248,30 @@ setInterval(() => {
     const normX = moveX / magnitude;
     const normZ = moveZ / magnitude;
 
-    const forwardX = Math.sin(player.yaw);
-    const forwardZ = Math.cos(player.yaw);
-    const rightX = Math.sin(player.yaw + Math.PI / 2);
-    const rightZ = Math.cos(player.yaw + Math.PI / 2);
+    const forwardX = -Math.sin(player.yaw);
+    const forwardZ = -Math.cos(player.yaw);
+    const rightX = Math.cos(player.yaw);
+    const rightZ = -Math.sin(player.yaw);
 
     const velocityX = (rightX * normX + forwardX * normZ) * PLAYER_SPEED;
     const velocityZ = (rightZ * normX + forwardZ * normZ) * PLAYER_SPEED;
 
     player.pos.x = clampToArena(player.pos.x + velocityX * dt);
     player.pos.z = clampToArena(player.pos.z + velocityZ * dt);
-    player.pos.y = PLAYER_HEIGHT;
+
+    if (player.input.jump && player.onGround) {
+      player.vy = JUMP_SPEED;
+      player.onGround = false;
+    }
+
+    player.vy -= GRAVITY * dt;
+    player.pos.y += player.vy * dt;
+
+    if (player.pos.y <= PLAYER_HEIGHT) {
+      player.pos.y = PLAYER_HEIGHT;
+      player.vy = 0;
+      player.onGround = true;
+    }
   });
 
   broadcastState();
