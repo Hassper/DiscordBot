@@ -82,6 +82,7 @@ let mouseSensitivity = Number(els.sensInput.value) / 1000;
 let renderHz = Number(els.hzSelect.value);
 let lastRenderStamp = 0;
 let pausedByUnlock = false;
+let selectedLevel = 1;
 
 let myState = null;
 let prevPvpHp = MAX_HP;
@@ -574,9 +575,14 @@ function renderLevelSelect() {
   els.levelSelect.innerHTML = '';
   levelConfigs.forEach((lvl, i) => {
     const b = document.createElement('button');
-    b.className = 'levelBtn';
+    b.className = `levelBtn ${selectedLevel === lvl.id ? 'selected' : ''}`;
     b.textContent = `L${lvl.id} ${'⭐'.repeat(profile.levelStars[i])}`;
-    b.addEventListener('click', () => startMode(GAME_MODE.LEVELS, lvl.id));
+    b.title = 'Нажми для старта уровня';
+    b.addEventListener('click', () => {
+      selectedLevel = lvl.id;
+      renderLevelSelect();
+      startMode(GAME_MODE.LEVELS, lvl.id);
+    });
     els.levelSelect.appendChild(b);
   });
 }
@@ -657,7 +663,10 @@ els.sensInput.addEventListener('input', () => {
 });
 els.hzSelect.addEventListener('change', () => { renderHz = Number(els.hzSelect.value); });
 els.menuBtn.addEventListener('click', openMenu);
-els.levelBtn.addEventListener('click', () => setActiveTab('play'));
+els.levelBtn.addEventListener('click', () => {
+  setActiveTab('play');
+  startMode(GAME_MODE.LEVELS, selectedLevel);
+});
 els.pvpBtn.addEventListener('click', () => startMode(GAME_MODE.PVP));
 els.benchmarkBtn.addEventListener('click', () => startMode(GAME_MODE.BENCHMARK));
 els.resumeBtn.addEventListener('click', () => { els.lockOverlay.classList.add('hidden'); lockPointerHard(); });
