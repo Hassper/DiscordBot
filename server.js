@@ -7,14 +7,16 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const TICK_RATE = 30;
+const TICK_RATE = 60;
 const MAP_SIZE = 32;
 const PLAYER_SPEED = 9;
-const PLAYER_RADIUS = 0.6;
+const PLAYER_RADIUS = 0.62;
 const PLAYER_HEIGHT = 1.8;
-const SHOOT_DISTANCE = 60;
-const DAMAGE = 34;
+const SHOOT_DISTANCE = 70;
+const BODY_DAMAGE = 34;
+const HEAD_DAMAGE = 58;
 const RESPAWN_TIME_MS = 1500;
+const FIRE_INTERVAL_MS = 105;
 
 app.use(express.static('public'));
 
@@ -44,21 +46,32 @@ const normalize = (x, y, z) => {
   return { x: x / len, y: y / len, z: z / len };
 };
 
-const distancePointToLine = (point, lineOrigin, lineDir) => {
-  const px = point.x - lineOrigin.x;
-  const py = point.y - lineOrigin.y;
-  const pz = point.z - lineOrigin.z;
+const raySphereDistance = (origin, dir, center, radius) => {
+  const ocX = origin.x - center.x;
+  const ocY = origin.y - center.y;
+  const ocZ = origin.z - center.z;
 
-  const t = px * lineDir.x + py * lineDir.y + pz * lineDir.z;
-  if (t < 0 || t > SHOOT_DISTANCE) {
-    return Infinity;
+  const b = ocX * dir.x + ocY * dir.y + ocZ * dir.z;
+  const c = ocX * ocX + ocY * ocY + ocZ * ocZ - radius * radius;
+  const h = b * b - c;
+
+  if (h < 0) {
+    return null;
   }
 
-  const closestX = lineOrigin.x + lineDir.x * t;
-  const closestY = lineOrigin.y + lineDir.y * t;
-  const closestZ = lineOrigin.z + lineDir.z * t;
+  const sqrtH = Math.sqrt(h);
+  const tNear = -b - sqrtH;
+  const tFar = -b + sqrtH;
 
-  return Math.hypot(point.x - closestX, point.y - closestY, point.z - closestZ);
+  if (tNear >= 0 && tNear <= SHOOT_DISTANCE) {
+    return tNear;
+  }
+
+  if (tFar >= 0 && tFar <= SHOOT_DISTANCE) {
+    return tFar;
+  }
+
+  return null;
 };
 
 const packPlayer = (player) => ({
@@ -93,65 +106,77 @@ const processShot = (shooterId, payload) => {
     return;
   }
 
+  const shotTime = now();
+  if (shotTime - shooter.lastShotAt < FIRE_INTERVAL_MS) {
+    return;
+  }
+  shooter.lastShotAt = shotTime;
+
   const dir = normalize(payload.dir?.x ?? 0, payload.dir?.y ?? 0, payload.dir?.z ?? 0);
   if (!dir.x && !dir.y && !dir.z) {
     return;
   }
 
-  let bestTarget = null;
-  let bestDistance = Infinity;
+  let best = null;
 
   players.forEach((target) => {
     if (target.id === shooter.id || !target.alive) {
       return;
     }
 
-    const bodyCenter = {
-      x: target.pos.x,
-      y: target.pos.y,
-      z: target.pos.z
-    };
+    const bodyCenter = { x: target.pos.x, y: target.pos.y - 0.45, z: target.pos.z };
+    const headCenter = { x: target.pos.x, y: target.pos.y + 0.5, z: target.pos.z };
 
-    const distanceToRay = distancePointToLine(bodyCenter, shooter.pos, dir);
-    if (distanceToRay <= PLAYER_RADIUS * 1.4) {
-      const directDistance = Math.hypot(
-        bodyCenter.x - shooter.pos.x,
-        bodyCenter.y - shooter.pos.y,
-        bodyCenter.z - shooter.pos.z
-      );
+    const bodyHit = raySphereDistance(shooter.pos, dir, bodyCenter, 0.72);
+    const headHit = raySphereDistance(shooter.pos, dir, headCenter, 0.36);
 
-      if (directDistance < bestDistance) {
-        bestDistance = directDistance;
-        bestTarget = target;
-      }
+    if (bodyHit === null && headHit === null) {
+      return;
+    }
+
+    const isHead = headHit !== null && (bodyHit === null || headHit < bodyHit);
+    const hitDistance = isHead ? headHit : bodyHit;
+
+    if (!best || hitDistance < best.hitDistance) {
+      best = {
+        target,
+        hitDistance,
+        isHead
+      };
     }
   });
 
-  if (!bestTarget) {
+  if (!best) {
     io.to(shooter.id).emit('shotResult', { hit: false });
     return;
   }
 
-  bestTarget.hp -= DAMAGE;
-  bestTarget.lastHitAt = now();
+  const damage = best.isHead ? HEAD_DAMAGE : BODY_DAMAGE;
+  best.target.hp -= damage;
+  best.target.lastHitAt = shotTime;
 
-  if (bestTarget.hp <= 0) {
-    bestTarget.alive = false;
+  if (best.target.hp <= 0) {
+    best.target.alive = false;
     shooter.score += 1;
     io.emit('killFeed', {
       killer: shooter.name,
-      victim: bestTarget.name
+      victim: best.target.name,
+      headshot: best.isHead
     });
 
     setTimeout(() => {
-      const stillThere = players.get(bestTarget.id);
+      const stillThere = players.get(best.target.id);
       if (stillThere) {
         respawnPlayer(stillThere);
       }
     }, RESPAWN_TIME_MS);
   }
 
-  io.to(shooter.id).emit('shotResult', { hit: true });
+  io.to(shooter.id).emit('shotResult', {
+    hit: true,
+    headshot: best.isHead,
+    damage
+  });
 };
 
 io.on('connection', (socket) => {
@@ -169,7 +194,8 @@ io.on('connection', (socket) => {
       moveX: 0,
       moveZ: 0
     },
-    lastHitAt: now()
+    lastHitAt: now(),
+    lastShotAt: 0
   };
 
   players.set(socket.id, player);
@@ -208,14 +234,22 @@ setInterval(() => {
       return;
     }
 
-    const sin = Math.sin(player.yaw);
-    const cos = Math.cos(player.yaw);
+    const moveX = player.input.moveX;
+    const moveZ = player.input.moveZ;
+    const magnitude = Math.hypot(moveX, moveZ) || 1;
+    const normX = moveX / magnitude;
+    const normZ = moveZ / magnitude;
 
-    const dx = (cos * player.input.moveX + sin * player.input.moveZ) * PLAYER_SPEED * dt;
-    const dz = (-sin * player.input.moveX + cos * player.input.moveZ) * PLAYER_SPEED * dt;
+    const forwardX = Math.sin(player.yaw);
+    const forwardZ = Math.cos(player.yaw);
+    const rightX = Math.sin(player.yaw + Math.PI / 2);
+    const rightZ = Math.cos(player.yaw + Math.PI / 2);
 
-    player.pos.x = clampToArena(player.pos.x + dx);
-    player.pos.z = clampToArena(player.pos.z + dz);
+    const velocityX = (rightX * normX + forwardX * normZ) * PLAYER_SPEED;
+    const velocityZ = (rightZ * normX + forwardZ * normZ) * PLAYER_SPEED;
+
+    player.pos.x = clampToArena(player.pos.x + velocityX * dt);
+    player.pos.z = clampToArena(player.pos.z + velocityZ * dt);
     player.pos.y = PLAYER_HEIGHT;
   });
 

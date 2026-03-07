@@ -20,6 +20,7 @@ canvas {
   position: fixed;
   top: 14px;
   left: 14px;
+  min-width: 350px;
   background: rgba(0, 0, 0, 0.42);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 10px;
@@ -30,14 +31,30 @@ canvas {
 
 #hud .row {
   display: flex;
-  gap: 14px;
-  margin: 4px 0;
+  gap: 12px;
+  margin: 6px 0;
+  align-items: center;
   flex-wrap: wrap;
 }
 
 #hud .controls {
   opacity: 0.82;
   font-size: 12px;
+}
+
+.hpBar {
+  width: 160px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+#healthFill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ff5050, #ffc14d, #62ff8f);
+  transition: width 120ms linear;
 }
 
 #crosshair {
@@ -140,7 +157,7 @@ button.secondary {
   position: fixed;
   top: 14px;
   right: 16px;
-  width: 260px;
+  width: 280px;
   font-size: 14px;
   z-index: 10;
 }
